@@ -1,8 +1,11 @@
 # from nodes.pynodes import python_node, data_node
+import os
 import pandas as pd
 import json
 import subprocess
 import sys
+from quest.paths import get_path
+QUEST_ROOT = get_path()
 # from nodes.sequence import *
 def build_graph(df):
     graph_temp = {}
@@ -69,7 +72,17 @@ class flow:
         self.nodes_df = pd.DataFrame(columns=['node_id', 'node_name', 'node_type', 'node_input_variable','node_input_value','node_function_wrapper', 'node_imports'])
         self.connections_df = pd.DataFrame(columns=['connection_id', 'from_node', 'to_node','mapping'])
         self.py_dict = {"imports": {}, "node_functions": {},"node_instantiations":{}, "set_inputs":{},"node_connections": {},"get_outputs":{}}
-        self.py_dict["imports"]["main"] = "from quest.snl_libraries.workspace.nodes.pynodes import python_node, data_node"
+        self.py_dict["imports"]["main"] = (
+            "import sys\n"
+            "import os\n"
+            "import json\n"
+            "import tempfile\n"
+            "import pandas as pd\n"
+            f"QUEST_ROOT = r'{QUEST_ROOT}'\n"
+            "sys.path.insert(0, os.path.dirname(QUEST_ROOT))\n"
+            "from quest.snl_libraries.workspace.nodes.pynodes import python_node, data_node\n"
+            "from quest.snl_libraries.workspace.flow.questflow import *\n"
+        )
         self.py_file_name = ''
         self.main_py = ''
         if nodes_df is not None:
@@ -353,20 +366,80 @@ class flow:
         with open(self.py_file_name , 'w') as py_file:
             py_file.write(self.main_py)
      
-    def run(self):
+    def run(self, python_executable=None, stream_output=False):
         if self.py_file_name == '':
-            print('Please make the flow Python program by running flow.make(py_file_name)')
+            print('Please make the flow Python program by running flow.make() first')
             return
+
+        import platform
+
+        python_exe = python_executable or sys.executable
+
+        if not os.path.isfile(python_exe):
+            raise RuntimeError(f"Python executable not found: {python_exe}")
+
+        env = os.environ.copy()
+
+        if platform.system() == "Windows":
+            scripts_dir = os.path.dirname(python_exe)
+            venv_root = os.path.dirname(scripts_dir)
+            env["VIRTUAL_ENV"] = venv_root
+            env["PATH"] = scripts_dir + os.pathsep + env.get("PATH", "")
+            command = [python_exe, self.py_file_name]
+        else:
+            activate_script_path = python_exe.replace('bin/python', 'bin/activate')
+            if activate_script_path == python_exe:
+                activate_script_path = os.path.join(os.path.dirname(os.path.dirname(python_exe)), 'bin', 'activate')
+            venv_root = os.path.dirname(os.path.dirname(python_exe))
+            env["VIRTUAL_ENV"] = venv_root
+            env["PATH"] = os.path.join(venv_root, "bin") + os.pathsep + env.get("PATH", "")
+            command = ["/bin/bash", "-c", f"source '{activate_script_path}' && '{python_exe}' '{self.py_file_name}'"]
+
         try:
-            # Run the Python script using subprocess.run
-            print(sys.executable)
-            result = subprocess.run([sys.executable, self.py_file_name], capture_output=True, text=True)
-            
-            # Print the output and error (if any)
+            print(f"Running with command: {command}")
+
+            if stream_output:
+                proc = subprocess.Popen(
+                    command,
+                    cwd=QUEST_ROOT,
+                    bufsize=1,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True,
+                    env=env,
+                )
+
+                while proc.poll() is None:
+                    line = proc.stdout.readline()
+                    if line:
+                        print(line, end="")
+
+                rest = proc.stdout.read()
+                if rest:
+                    print(rest, end="")
+
+                if proc.returncode != 0:
+                    raise RuntimeError("Flow execution failed")
+
+                return proc
+
+            result = subprocess.run(
+                command,
+                cwd=QUEST_ROOT,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+
             print("Output:\n", result.stdout)
             if result.stderr:
                 print("Error:\n", result.stderr)
+
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr or result.stdout or "Flow execution failed")
+
+            return result
+
         except Exception as e:
             print(f"An error occurred while running the script: {e}")
-        return result
-
+            raise

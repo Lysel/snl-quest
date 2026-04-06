@@ -1,22 +1,51 @@
 @echo off
+setlocal
 
 REM Set the path to the virtual environment
 set VENV_PATH=%~dp0..\..\..\app_envs\env_tech
 
-REM Set the path to the setup.py file
-set SETUP_PATH=%~dp0..\..\..\snl_libraries\snl_tech_selection
+REM Set the path to the bundled Tech Selection package in this QuESt installation
+set LOCAL_TECH_PATH=%~dp0..\..\..\snl_libraries\snl_tech_selection
+
+REM Rebuild the environment if it exists but is incomplete.
+if exist "%VENV_PATH%" (
+    if not exist "%VENV_PATH%\Scripts\activate.bat" (
+        echo Existing Tech Selection environment is incomplete. Recreating it...
+        rmdir /s /q "%VENV_PATH%"
+    )
+)
 
 REM Create the virtual environment if it doesn't exist
-if not exist "%VENV_PATH%" (
-    python -m venv %VENV_PATH%
+if not exist "%VENV_PATH%\Scripts\activate.bat" (
+    python -m venv "%VENV_PATH%"
+    if errorlevel 1 (
+        echo Failed to create the Tech Selection virtual environment.
+        exit /b 1
+    )
 )
 
 REM Activate the virtual environment
-call "%VENV_PATH%\Scripts\activate"
+call "%VENV_PATH%\Scripts\activate.bat"
+if errorlevel 1 (
+    echo Failed to activate the Tech Selection virtual environment.
+    exit /b 1
+)
 
-REM Install the Python package within the virtual environment
+REM Allow this app installer to resolve packages from configured package indexes.
+set "PIP_NO_INDEX=0"
 
-pip install "%SETUP_PATH%"
+REM Ensure the bundled Tech Selection package exists
+if not exist "%LOCAL_TECH_PATH%\setup.py" (
+    echo Failed to locate bundled Tech Selection sources at "%LOCAL_TECH_PATH%".
+    exit /b 1
+)
+
+REM Install the Python package within the virtual environment from the local source bundle
+pip install "%LOCAL_TECH_PATH%"
+if errorlevel 1 (
+    echo Failed to install QuESt Tech Selection from "%LOCAL_TECH_PATH%".
+    exit /b 1
+)
 
 REM Define the GLPK URL and destination
 set URL=https://sourceforge.net/projects/winglpk/files/winglpk/GLPK-4.65/winglpk-4.65.zip/download
@@ -46,8 +75,6 @@ del %OUTPUT%
 
 echo GLPK installation successful
 
-garden install matplotlib
-echo Garden installation matplotlib succesful
 REM Deactivate the virtual environment
 deactivate
 exit /b 0

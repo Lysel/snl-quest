@@ -1,10 +1,10 @@
 <img src="quest/snl_libraries/snl_btm/btm/es_gui/resources/logo/Quest_Logo_RGB.png" alt="QuESt logo" width=300px margin="auto" />
 
-# QuESt 2.0.b: Open-source Platform for Energy Storage Analytics
+# QuESt: Open-source Platform for Energy Storage Analytics
 
-Current release version: 2.0
+Current release version: 2.1
 
-Release date: March, 2024
+Release date: June, 2025
 
 ## Contact
 For issues and feedback we would appreciate it if you could use the "Issues" feature of this repository. This helps others join the discussion and helps us keep track of and document issues.
@@ -154,7 +154,7 @@ QuESt is currently available on Github at: https://github.com/sandialabs/snl-que
 
 7. With the virtual env activated we can now setup the environment for QuESt with the following command:
     ```bash
-    python3 -m pip install -e .
+    python3 -m pip install .
     ```
 8. Run QuESt with the following command:
 
@@ -214,7 +214,7 @@ QuESt is currently available on Github at: https://github.com/sandialabs/snl-que
 
 3. Install Dependencies:
     ```bash
-    pip install -e .
+    pip install .
     ```
 
 ## Running QuESt
